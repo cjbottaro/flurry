@@ -73,3 +73,6 @@ topology.emit(:range, [0, 1_000_000])
 topology.emit(:range, [0, 1_000_000])
 topology.emit(:range, [0, 1_000_000])
 topology.end_computation
+
+stats = Flurry::Stats.aggregate(topology)
+Flurry::Stats.pretty_print(stats)

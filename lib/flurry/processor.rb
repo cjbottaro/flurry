@@ -7,7 +7,7 @@ module Flurry
     }
 
     attr_reader :workers, :router
-    attr_accessor :outgoing_routers
+    attr_accessor :outgoing_routers, :stats
 
     def initialize(attributes = {})
       attributes = DEFAULT_ATTRIBUTES.merge(attributes)
@@ -44,6 +44,7 @@ module Flurry
 
     def emit(message)
       outgoing_routers.each{ |router| router.route(message) }
+      stats.emit_count += 1
     end
 
   end

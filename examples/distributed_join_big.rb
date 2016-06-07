@@ -77,6 +77,9 @@ topology.add_processor :joiner, EqJoiner, concurrency: 4, router: JoiningRouter.
 topology.add_link :reader, :joiner
 
 topology.begin_computation
-topology.emit :reader, "../data_gen/users_small.csv"
-topology.emit :reader, "../data_gen/posts_small.csv"
+topology.emit :reader, "../data_gen/users_#{ARGV[0]}.csv"
+topology.emit :reader, "../data_gen/posts_#{ARGV[0]}.csv"
 topology.end_computation
+
+stats = Flurry::Stats.aggregate(topology)
+Flurry::Stats.pretty_print(stats)

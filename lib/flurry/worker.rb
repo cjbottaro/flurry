@@ -1,4 +1,5 @@
 require "gen_server"
+require "flurry/stats"
 
 module Flurry
   class Worker
@@ -17,6 +18,8 @@ module Flurry
         handle_call_setup(message)
       when :done
         handle_call_done(from)
+      when :stats
+        handle_call_stats
       else
         raise ArgumentError, "unexpected message type: #{type.inspect}"
       end
@@ -27,16 +30,23 @@ module Flurry
       @processor.outgoing_routers = hash[:routers]
       @incoming_pids = hash[:incoming_pids]
       @done_from = []
+      @stats = Flurry::Stats.new
+      @stats.start_at = Time.now
+      @processor.stats = @stats
     end
 
     def handle_call_done(from)
-      #puts "<#{Process.pid}> Got done from #{from}"
       @done_from << from
       if @incoming_pids == [] || Set.new(@done_from) == Set.new(@incoming_pids)
-        #puts "I am done: #{@done_from.inspect}"
+        @stats.done_received_at = Time.now
         @processor.done
+        @stats.done_at = Time.now
         @processor.outgoing_routers.each{ |router| router.broadcast([:done]) }
       end
+    end
+
+    def handle_call_stats
+      @stats
     end
 
     def handle_cast(message)
@@ -50,7 +60,15 @@ module Flurry
     end
 
     def handle_cast_message(message)
-      @processor.process(message)
+      if @stats.first_message_at
+        @stats.wait_time += Time.now - @last_message_processed_at
+      else
+        @stats.first_message_at = Time.now
+        @stats.wait_time += @stats.first_message_at - @stats.start_at
+      end
+      @stats.add_time(:code_time){ @processor.process(message) }
+      @stats.message_count += 1
+      @last_message_processed_at = Time.now
     end
 
     def emit(message)

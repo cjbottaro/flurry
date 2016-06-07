@@ -78,3 +78,4 @@ topology.begin_computation
 topology.emit :reader, "../tempest/examples/distributed_join/people.csv"
 topology.emit :reader, "../tempest/examples/distributed_join/vehicles.csv"
 topology.end_computation
+puts topology.stats.inspect
