@@ -21,7 +21,7 @@ end
 class Counter
   include Flurry::Processor
 
-  def init
+  def initial_state
     @count = 0
   end
 
@@ -38,7 +38,7 @@ end
 class Summer
   include Flurry::Processor
 
-  def init
+  def initial_state
     @sum = 0
   end
 
@@ -52,27 +52,21 @@ class Summer
 
 end
 
-range = RangeEmitter.new concurrency: 4, router: :shuffle
-repeater = Repeater.new concurrency: 4
-counter = Counter.new concurrency: 4
-summer = Summer.new
-
 topology = Flurry::Topology.new
-topology.add_processor(:range,    range)
-topology.add_processor(:repeater, repeater)
-topology.add_processor(:counter,  counter)
-topology.add_processor(:summer,   summer)
+topology.add_processor(:range,    RangeEmitter, concurrency: 4, router: Flurry::Router::Shuffle)
+topology.add_processor(:repeater, Repeater, concurrency: 4)
+topology.add_processor(:counter,  Counter, concurrency: 4)
+topology.add_processor(:summer,   Summer)
 
 topology.add_link(:range, :repeater)
 topology.add_link(:repeater, :counter)
 topology.add_link(:counter, :summer)
 
 topology.begin_computation
-topology.emit(:range, [0, 1_000_000])
-topology.emit(:range, [0, 1_000_000])
-topology.emit(:range, [0, 1_000_000])
-topology.emit(:range, [0, 1_000_000])
+topology.emit(:range, [0, 1_000])
+topology.emit(:range, [0, 1_000])
+topology.emit(:range, [0, 1_000])
+topology.emit(:range, [0, 1_000])
 topology.end_computation
 
-stats = Flurry::Stats.aggregate(topology)
-Flurry::Stats.pretty_print(stats)
+Flurry::Stats.pretty_print(topology.stats)

@@ -10,12 +10,11 @@ module Flurry
     end
 
     def handle_call(from, message)
-      type, message = message
-      case type
+      case message.shift
       when :message
-        handle_call_message(message)
+        handle_call_message(*message)
       when :setup
-        handle_call_setup(message)
+        handle_call_setup(*message)
       when :done
         handle_call_done(from)
       when :stats
@@ -25,14 +24,19 @@ module Flurry
       end
     end
 
-    def handle_call_setup(hash)
-      # puts hash.inspect
-      @processor.outgoing_routers = hash[:routers]
-      @incoming_pids = hash[:incoming_pids]
+    def handle_call_setup(routers, incoming_pids, args)
+      @routers = routers
+      @incoming_pids = incoming_pids
+
+      @processor.set_worker(self)
+      @processor.initial_state
+      @processor.before_begin_computation(*args)
+
       @done_from = []
       @stats = Flurry::Stats.new
       @stats.start_at = Time.now
-      @processor.stats = @stats
+
+      Process.setproctitle("FlurryWorker - #{@processor.class}")
     end
 
     def handle_call_done(from)
@@ -41,7 +45,7 @@ module Flurry
         @stats.done_received_at = Time.now
         @processor.done
         @stats.done_at = Time.now
-        @processor.outgoing_routers.each{ |router| router.broadcast([:done]) }
+        @routers.each{ |router| router.broadcast([:done]) }
       end
     end
 
@@ -61,10 +65,10 @@ module Flurry
 
     def handle_cast_message(message)
       if @stats.first_message_at
-        @stats.wait_time += Time.now - @last_message_processed_at
+        @stats.idle_time += Time.now - @last_message_processed_at
       else
         @stats.first_message_at = Time.now
-        @stats.wait_time += @stats.first_message_at - @stats.start_at
+        @stats.idle_time += @stats.first_message_at - @stats.start_at
       end
       @stats.add_time(:code_time){ @processor.process(message) }
       @stats.message_count += 1
@@ -73,6 +77,11 @@ module Flurry
 
     def emit(message)
       cast [:message, message]
+    end
+
+    def emit_from_processor(message)
+      @routers.each{ |router| router.route(message) }
+      @stats.emit_count += 1
     end
 
   private

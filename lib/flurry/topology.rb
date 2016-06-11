@@ -1,22 +1,54 @@
+require "flurry/router"
+
 module Flurry
   class Topology
 
-    attr_reader :processors
+    DEFAULT_COMPONENT_OPTIONS = {
+      concurrency: 1,
+      router: Router::Random
+    }
+
+    attr_reader :components, :links, :stats
+    private :components, :links
 
     def initialize
-      @processors = {}
+      @components = {}
       @links = []
     end
 
     def add_processor(name, processor, options = {})
-      case processor
+      options = DEFAULT_COMPONENT_OPTIONS.merge(options)
+
+      component_options, processor_options = options.partition do |option|
+        DEFAULT_COMPONENT_OPTIONS.has_key?(option)
+      end
+
+      processor = case processor
       when Flurry::Processor
-        @processors[name] = processor
+        processor
       when Class
-        @processors[name] = processor.new(options)
+        processor.new(processor_options)
       else
         raise ArgumentError, "unexpected processor: #{processor.inspect}"
       end
+
+      router = case options[:router]
+      when Flurry::Router
+        router
+      when Class
+        options[:router].new
+      when Array
+        router_klass, *router_options = options[:router]
+        router_klass.new(*router_options)
+      else
+        raise ArgumentError, "unexpected router options: #{options[:router]}"
+      end
+
+      concurrency = options[:concurrency]
+
+      @components[name] = Component.new(processor, concurrency, router)
+
+      self
     end
 
     def add_link(src, dst)
@@ -37,43 +69,46 @@ module Flurry
       end
     end
 
-    def begin_computation
-      processors.each do |name, processor|
-        processor.workers.each do |worker|
-          setup = {
-            routers: outgoing_routers(name),
-            incoming_pids: incoming_pids(name)
-          }
-          worker.call [:setup, setup]
-        end
+    def begin_computation(*args)
+      @stats = nil
+      components.each do |name, component|
+        routers       = outgoing_routers(name)
+        incoming_pids = incoming_pids(name)
+
+        component.setup(routers, incoming_pids, args)
       end
     end
 
     def emit(name, message)
-      processors[name].router.route(message)
+      components[name].emit(message)
     end
 
     def end_computation
-      processors.each do |name, processor|
+      # Block until done.
+      components.each do |name, component|
         if incoming_links(name) == []
-          processor.workers.each{ |w| w.call [:done] }
+          component.end_computation
         end
       end
+
+      # Collect the stats.
+      @stats = components.inject({}) do |memo, (name, component)|
+        memo[name] = component.worker_stats
+        memo
+      end
+
+      # Kill the processes.
+      components.values.each(&:terminate)
     end
 
   private
 
     def outgoing_routers(name)
-      outgoing_links(name).map{ |name| processors[name].router }
+      outgoing_links(name).map{ |name| components[name].router }
     end
 
     def incoming_pids(name)
-      incoming_links(name).inject([]) do |memo, name|
-        processors[name].workers.each do |w|
-          memo << w.pid
-        end
-        memo
-      end
+      incoming_links(name).map{ |name| components[name].pids }.flatten
     end
 
   end

@@ -8,11 +8,11 @@ module Flurry
                   :done_received_at,
                   :done_at,
                   :code_time,
-                  :wait_time
+                  :idle_time
 
     def self.aggregate(topology)
-      topology.processors.inject({}) do |memo, (name, processor)|
-        memo[name] = processor.workers.inject({}) do |memo, worker|
+      topology.components.inject({}) do |memo, (name, components)|
+        memo[name] = components.workers.inject({}) do |memo, worker|
           memo[worker.inspect] = worker.call [:stats]
           memo
         end
@@ -28,10 +28,10 @@ module Flurry
           puts "    messages          : %d" % stats.message_count
           puts "    emits             : %d" % stats.emit_count
           puts "    real time         : %.5f" % stats.real_time
-          puts "    code time         : %.5f" % stats.code_time
-          puts "    done time         : %.5f" % stats.done_time
           puts "    wait time         : %.5f" % stats.wait_time
-          puts "    wait time (first) : %.5f" % stats.wait_time_first
+          puts "    code time         : %.5f" % stats.code_time
+          puts "    idle time         : %.5f" % stats.idle_time
+          puts "    done time         : %.5f" % stats.done_time
           puts "    real throughput   : %.5f" % stats.real_throughput
           puts "    code throughput   : %.5f" % stats.code_throughput
           puts "    emit throughput   : %.5f" % stats.emit_throughput
@@ -43,7 +43,7 @@ module Flurry
       self.message_count = 0
       self.emit_count = 0
       self.code_time = 0
-      self.wait_time = 0
+      self.idle_time = 0
     end
 
     def add_time(field)
@@ -61,8 +61,12 @@ module Flurry
       done_at - done_received_at
     end
 
-    def wait_time_first
-      first_message_at - start_at
+    def wait_time
+      if first_message_at
+        first_message_at - start_at
+      else
+        0
+      end
     end
 
     def real_throughput

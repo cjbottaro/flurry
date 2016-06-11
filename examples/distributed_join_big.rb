@@ -76,7 +76,7 @@ topology.add_processor :joiner, EqJoiner, concurrency: 4, router: JoiningRouter.
 
 topology.add_link :reader, :joiner
 
-topology.begin_computation
+topology.begin_computation("hi mom")
 topology.emit :reader, "../data_gen/users_#{ARGV[0]}.csv"
 topology.emit :reader, "../data_gen/posts_#{ARGV[0]}.csv"
 topology.end_computation
