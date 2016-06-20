@@ -15,6 +15,7 @@ module Flurry
 
     def start_workers
       @workers = concurrency.times.map{ Worker.new(processor) }
+      @workers.each{ |w| Process.detach(w.pid) }
     end
 
     def build_router(router_spec)
@@ -57,7 +58,9 @@ module Flurry
     end
 
     def terminate
-      @workers.each{ |worker| Process.kill("TERM", worker.pid) }
+      @workers.each do |worker|
+        Process.kill("TERM", worker.pid)
+      end
     end
 
   end

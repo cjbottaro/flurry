@@ -69,7 +69,7 @@ module Flurry
       end
     end
 
-    def begin_computation(*args)
+    def begin_computation(*args, &block)
       @stats = nil
       components.each do |name, component|
         routers       = outgoing_routers(name)
@@ -77,6 +77,12 @@ module Flurry
 
         component.setup(routers, incoming_pids, args)
       end
+
+      block.call(self) if block_given?
+      end_computation
+    ensure
+      # Kill the processes.
+      components.values.each(&:terminate)
     end
 
     def emit(name, message)
@@ -96,9 +102,6 @@ module Flurry
         memo[name] = component.worker_stats
         memo
       end
-
-      # Kill the processes.
-      components.values.each(&:terminate)
     end
 
   private
