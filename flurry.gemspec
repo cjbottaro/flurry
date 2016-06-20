@@ -9,9 +9,9 @@ Gem::Specification.new do |spec|
   spec.authors       = ["Christopher J. Bottaro"]
   spec.email         = ["cjbottaro@alumni.cs.utexas.edu"]
 
-  spec.summary       = %q{TODO: Write a short summary, because Rubygems requires one.}
-  spec.description   = %q{TODO: Write a longer description or delete this line.}
-  spec.homepage      = "TODO: Put your gem's website or public repo URL here."
+  spec.summary       = %q{Parallel job topologies like Apache Storm}
+  spec.description   = %q{Parallel job topologies like Apache Storm, but smaller and for Ruby}
+  spec.homepage      = "https://github.com/cjbottaro/flurry"
   spec.license       = "MIT"
 
   # Prevent pushing this gem to RubyGems.org by setting 'allowed_push_host', or
